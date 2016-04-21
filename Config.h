@@ -32,8 +32,8 @@
 
 #define SENSORS true
 
-#define ALPHA 0.8F;  // Low pass constant.
-#define GYRO_TRUST 1.0F; // Percent Trust for gyro.
+#define ALPHA 0.8F  // Low pass constant.
+#define GYRO_TRUST 0.98F // Percent Trust for gyro.
 #define STICK_SENSITIVITY 3.0F // Higher value means less sensitive roll, pitch and yaw controll.
 
 #define ROLL_PID_KP   0.600000F
