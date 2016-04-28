@@ -662,6 +662,8 @@ void calculatePID() {
   float rollError = sensorRoll - rollSetPoint;
   if (abs(rollError) < 0.5) rollError = 0.0;
   rollErrSum += rollKi * rollError;
+  if (rollErrSum > ROLL_PID_MAX) rollErrSum = ROLL_PID_MAX;
+  if (rollErrSum < -ROLL_PID_MAX) rollErrSum = -ROLL_PID_MAX;
   rollOutput = (rollKp * rollError + rollErrSum + rollKd * (rollError - lastRollError));
   if (rollOutput > 180.0) rollOutput = 180.0;
   if (rollOutput < -180.0) rollOutput = -180.0;
@@ -674,6 +676,8 @@ void calculatePID() {
   float pitchError = sensorPitch - pitchSetPoint;
   if (abs(pitchError) < 0.5) pitchError = 0.0;
   pitchErrSum += pitchKi * pitchError;
+  if (pitchErrSum > PITCH_PID_MAX) pitchErrSum = PITCH_PID_MAX;
+  if (pitchErrSum < -PITCH_PID_MAX) pitchErrSum = -PITCH_PID_MAX;
   pitchOutput = (pitchKp * pitchError + pitchErrSum + pitchKd * (pitchError - lastPitchError));
   if (pitchOutput > 180.0) pitchOutput = 180.0;
   if (pitchOutput < -180.0) pitchOutput = -180.0;
@@ -686,6 +690,8 @@ void calculatePID() {
   float error_tmp = sensorYaw - yawSetPoint;
   if (abs(yawError) < 0.5) yawError = 0.0;
   yawErrSum += yawKi * error_tmp;
+  if (yawErrSum > YAW_PID_MAX) yawErrSum = YAW_PID_MAX;
+  if (yawErrSum < -YAW_PID_MAX) yawErrSum = -YAW_PID_MAX;
   yawOutput = (yawKp * error_tmp + yawErrSum + yawKd * (error_tmp - lastYawError));
   if (yawOutput > 360.0) yawOutput = 360.0;
   if (yawOutput < -360.0) yawOutput = -360.0;
