@@ -1,5 +1,5 @@
 # TeensyQuad
-Custom quadcopter using a Teensy 3.2 for the processor.
+Custom quadcopter using a Teensy 3.6 for the processor.
 
 Using the GY-80 IMU device for gyro and accelerometer.
  - ADXL345: Accelerometer
@@ -11,4 +11,4 @@ Required libraries for gyro and accelerometer:
  - L3G4200D - https://github.com/pololu/l3g-arduino
  - HMC58831 - http://bildr.org/2012/02/hmc5883l_arduino/
 
-Controlled by: https://github.com/pobzeb/TeensyQuadController
+Controlled by: https://github.com/pobzeb/TeensyQuadReceiver
