@@ -11,18 +11,10 @@ int m1_val, m2_val, m3_val, m4_val;
 byte motorMode = 0b00001111;
 int maxMotorDelta = 0;
 
-// Radio input values.
-HardwareSerial *radio;
-int bytesAvailable;
-int rInputs[7];
-bool messageReady = false;
-bool displayResults = false;
-char rb = ' ';
-int b = 0;
-char currentPIDAxis = 'r';
-char action = ' ';
-float kValue = 0.0;
-unsigned char* kValuePtr = (unsigned char*)&kValue;
+// Receiver channels
+byte last_heartbeat, last_channel_1, last_channel_2, last_channel_3, last_channel_4;
+unsigned long heartbeatTimer, timer_1, timer_2, timer_3, timer_4, current_time;
+int heartbeatPulse;
 
 // PID controllers for all three axis
 float rollErrSum,   rollKp,   rollKi,   rollKd,   lastRollError;
@@ -45,45 +37,51 @@ float heading;
 float sensorRoll, sensorPitch, sensorYaw;
 
 // Current flight state and loop timer
-int state = 0;
 int flightState = STATE_WAITING_FOR_INIT;
 unsigned long loopTimer;
-unsigned long statusTxTimer;
-unsigned long heartbeatTimer;
 
 // Hold input Throttle, roll, pitch and yaw
 int throttle_input, roll_input, pitch_input, yaw_input;
 
 void setup() {
-  radio = &Serial1;
   Serial.begin(9600);
-  radio->begin(RADIO_SERIAL_BAUD_RATE);
 
-  // Zero out the radio buffer
   Serial.println(F("Beginning Setup"));
-  pinMode(LED, OUTPUT);
-  while(radio->read() != -1);
 
-#ifdef SENSORS
-  // Initialize the sensors
-  flashLED(2);
-  delay(200);
-  Serial.println(F("Sensor Setup"));
-  Sensors_init();
-#endif
+  if (SENSORS == true) {
+    // Initialize the sensors
+    flashLED(2);
+    delay(200);
+    Serial.println(F("Sensor Setup"));
+    Sensors_init();
+  }
 
-#ifdef MOTORS
-  // Initialize the motors
-  flashLED(2);
-  delay(200);
-  Serial.println(F("Motor Setup"));
-  Motors_init();
-#endif
+  if (MOTORS == true) {
+    // Initialize the motors
+    flashLED(2);
+    delay(200);
+    Serial.println(F("Motor Setup"));
+    Motors_init();
+  }
+
+  // Interrupts for receiver channels
+  pinMode(HEARTBEAT_PIN, INPUT);
+  pinMode(THROTTLE_CHANNEL_PIN, INPUT);
+  pinMode(YAW_CHANNEL_PIN, INPUT);
+  pinMode(PITCH_CHANNEL_PIN, INPUT);
+  pinMode(ROLL_CHANNEL_PIN, INPUT);
+  pinMode(ARM_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(HEARTBEAT_PIN), isrCheck, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(THROTTLE_CHANNEL_PIN), isrCheck, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(YAW_CHANNEL_PIN), isrCheck, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PITCH_CHANNEL_PIN), isrCheck, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ROLL_CHANNEL_PIN), isrCheck, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(ARM_PIN), isrCheck, CHANGE);
 
   // Now LED off
   delay(200);
   flashLED(6);
-  digitalWrite(LED, LOW);
+  digitalWriteFast(LED, LOW);
   Serial.println(F("Setup Complete"));
   delay(200);
 
@@ -94,9 +92,9 @@ void setup() {
 // Function to quickly flash led
 void flashLED(int times) {
   for (int i = 1; i <= times; i++) {
-    digitalWrite(LED, HIGH);
+    digitalWriteFast(LED, HIGH);
     delay(90);
-    digitalWrite(LED, LOW);
+    digitalWriteFast(LED, LOW);
     delay(90);
   }
 }
@@ -178,14 +176,14 @@ void doCalibration() {
   accelRoll  = 0;
   accelPitch = 0;
   accelYaw   = 0;
-  digitalWrite(LED, LOW);
+  digitalWriteFast(LED, LOW);
 
   // Calibrate and get a baseline setpoint for all axis
   unsigned long calibrationTimer = micros();
   int calibrationSteps = CALIBRATION_SAMPLE_SIZE;
   for (calIdx = 0; calIdx < calibrationSteps; calIdx++) {
     // Blink the LED
-    if (calIdx % 15 == 0) digitalWrite(LED, !digitalRead(LED));
+    if (calIdx % 15 == 0) digitalWriteFast(LED, !digitalRead(LED));
 
     // Read the sensor values
     readSensors();
@@ -205,7 +203,7 @@ void doCalibration() {
   yawCalibration   /= calibrationSteps;
 
   Serial.println(F("Calibration complete."));
-  digitalWrite(LED, LOW);
+  digitalWriteFast(LED, LOW);
 }
 
 void readSensors() {
@@ -297,35 +295,20 @@ void Motors_init() {
 }
 
 void loop() {
-#ifdef SENSORS
   // Read the gyro and calculate the new values
-  readSensors();
-#endif
-
-  // Check to see if there are new values
-  handleRadioInput();
-
-  // Check the heartbeat
-  if (micros() - heartbeatTimer > HEARTBEAT_TIMEOUT) {
-    // No heartbeat received so kill the motors
-    flightState = STATE_WAITING_FOR_INIT;
+  if (SENSORS == true) {
+    readSensors();
   }
-
-  // Get the setpoints.
-//  rollSetPoint = 0;
-//  if (roll_input > 1508) rollSetPoint = -1.0 * map((roll_input - 1508) / STICK_SENSITIVITY, 1500, 2000, 0, 90);
-//  else if (roll_input < 1492) rollSetPoint = map((roll_input - 1492) / STICK_SENSITIVITY, 1000, 1500, 0, 90);
-//  pitchSetPoint = 0;
-//  if (pitch_input > 1508) pitchSetPoint = (pitch_input - 1508) / STICK_SENSITIVITY;
-//  else if (pitch_input < 1492) pitchSetPoint = (pitch_input - 1492) / STICK_SENSITIVITY;
-//  yawSetPoint = 0;
-//  if (throttle_input > 1050) {
-//    if (yaw_input > 1508) yawSetPoint = (yaw_input - 1508) / STICK_SENSITIVITY;
-//    else if (yaw_input < 1492) yawSetPoint = (yaw_input - 1492) / STICK_SENSITIVITY;
-//  }
 
   // Calculate the pid motor values
   calculatePID();
+
+  // Check the heartbeat pulse is greater than the timeout
+  heartbeatPulse = micros() - heartbeatTimer;
+  if (heartbeatPulse > HEARTBEAT_TIMEOUT) {
+    // No heartbeat received so kill the motors
+    flightState = STATE_WAITING_FOR_INIT;
+  }
 
   if (flightState == STATE_RUNNING) {
     // Leave padding for pid values.
@@ -377,284 +360,132 @@ void loop() {
     m4_val = MIN_MOTOR_VALUE;
   }
 
-  // Wait LOOP_DT millis per loop.
-  while (micros() - loopTimer < (LOOP_DT * 1000));
+  // Wait at least 4ms.
+  while (micros() - loopTimer < 4000);
   loopTimer = micros();
 
-#ifdef DEBUG
-  // Print the results.
-//  printResults();
-#endif
-
-  // Send status over radio
-  if (micros() - statusTxTimer > STATUS_TX_TIMEOUT) {
-    // Print status to radio.
-    radio->printf(F("T %4d r %s%4.4f p %s%4.4f y %s%4.4f armed: %s  PID - Kp: %4.6f, Ki: %4.6f, Kd: %4.6f\n"), throttle_input, (sensorRoll < 0 ? "-" : "+"), abs(sensorRoll), (sensorPitch < 0 ? "-" : "+"), abs(sensorPitch), (sensorYaw < 0 ? "-" : "+"), abs(sensorYaw), flightState == STATE_RUNNING ? "True" : "False", rollKp, rollKi, rollKd);
-    statusTxTimer = micros();
+  if (DEBUG == true) {
+    // Print the results.
+    // printResults();
   }
 
-#ifdef MOTORS
-  // Write the current speed to each motor
-  m1.writeMicroseconds(m1_val);
-  m2.writeMicroseconds(m2_val);
-  m3.writeMicroseconds(m3_val);
-  m4.writeMicroseconds(m4_val);
-#endif
+  if (MOTORS == true) {
+    // Write the current speed to each motor
+    m1.writeMicroseconds(m1_val);
+    m2.writeMicroseconds(m2_val);
+    m3.writeMicroseconds(m3_val);
+    m4.writeMicroseconds(m4_val);
+  }
 }
 
-void handleRadioInput() {
-  // Get the number of bytes available
-  bytesAvailable = radio->available();
+void isrCheck() {
+  current_time = micros();
 
-  // If there is data to read, read it
-  if (bytesAvailable > 0) {
-    digitalWrite(LED, HIGH);
-    while (bytesAvailable > 0) {
-      // Look for start of message character.
-      if (state == 0) {
-        b = 0;
-        messageReady = false;
-        displayResults = false;
-        rb = (char)radio->read();
-
-        // Check to see if this is the beginning of the message
-        if (rb == 'm') {
-          // Move to next state
-          state = 1;
-        }
-        else if (rb == 'k') {
-          // Move to keyboard input state
-          state = 2;
-        }
-        else if (rb == 'h') {
-          // Move to heartbeat state
-          state = 3;
-        }
-        else {
-          // Reset state
-          state = 0;
-        }
-        continue;
-      }
-      // Read message bytes.
-      else if (state == 1) {
-        // Read the byte.
-        rInputs[b] = radio->read();
-
-        // Check to see if we found the start of another message instead.
-        if ((char)rInputs[b] == 'm') {
-          messageReady = false;
-          b = 0;
-          continue;
-        }
-
-        // Increment byte counter.
-        b++;
-
-        // Check to see if that was the end of the message.
-        if (b == 7) messageReady = true;
-      }
-      else if (state == 2) {
-        // Read the command and value
-        if (b == 0) {
-          action = (char) radio->read();
-        }
-        else {
-          kValuePtr[b - 1] = radio->read();
-        }
-
-        // Increment byte counter.
-        b++;
-
-        if (b == 5) {
-          Serial.printf(F("Command: %c, Value: %4.6f\n"), action, kValue);
-
-          switch (action) {
-            case 't': /* Throttle */ {
-              throttle_input = (int)kValue;
-              break;
-            }
-            case 'q': /* Roll Kp PID Setting */  {
-              rollKp = kValue;
-              currentPIDAxis = 'r';
-              break;
-            }
-            case 'a': /* Roll Ki PID Setting */  {
-              rollKi = kValue;
-              currentPIDAxis = 'r';
-              break;
-            }
-            case 'z': /* Roll Kd PID Setting */  {
-              rollKd = kValue;
-              currentPIDAxis = 'r';
-              break;
-            }
-            case 'w': /* Pitch Kp PID Setting */  {
-              pitchKp = kValue;
-              currentPIDAxis = 'p';
-              break;
-            }
-            case 's': /* Pitch Ki PID Setting */  {
-              pitchKi = kValue;
-              currentPIDAxis = 'p';
-              break;
-            }
-            case 'x': /* Pitch Kd PID Setting */  {
-              pitchKd = kValue;
-              currentPIDAxis = 'p';
-              break;
-            }
-            case 'e': /* Yaw Kp PID Setting */  {
-              yawKp = kValue;
-              currentPIDAxis = 'y';
-              break;
-            }
-            case 'd': /* Yaw Ki PID Setting */  {
-              yawKi = kValue;
-              currentPIDAxis = 'y';
-              break;
-            }
-            case 'c': /* Yaw Kd PID Setting */  {
-              yawKd = kValue;
-              currentPIDAxis = 'y';
-              break;
-            }
-          }
-
-          // Print the results.
-//          printResults();
-
-          // Reset for the next command
-          state = 0;
-          messageReady = false;
-          b = 0;
-        }
-      }
-      else if (state == 3) {
-          heartbeatTimer = micros();
-          radio->read();
-          Serial.println(F("HEARTBEAT"));
-//          printResults();
-
-          // Reset for the next command
-          state = 0;
-          messageReady = false;
-          b = 0;
-      }
-
-      // If the message is ready, parse the bytes.
-      if (messageReady == true) {
-        for (b = 0; b < 7; b++) {
-          switch (b) {
-            case 0: /* Throttle */ {
-              throttle_input = (int)map(rInputs[b], 0, 255, 1000, 2000);
-              break;
-            }
-            case 1: /* Yaw */ {
-              yawSetPoint = (int)map(rInputs[b], 0, 255, -45, 45);
-              break;
-            }
-            case 2: /* Pitch */ {
-              pitchSetPoint = (int)map(rInputs[b], 0, 255, -45, 45);
-              break;
-            }
-            case 3: /* Roll */ {
-              rollSetPoint = (int)map(rInputs[b], 0, 255, -45, 45);
-              break;
-            }
-            case 4: /* L_Trigger */ {
-//              float value = map(rInputs[b], 0, 255, -1.0f, 1.0f);
-              break;
-            }
-            case 5: /* R_Trigger */ {
-//              float value = map(rInputs[b], 0, 255, -1.0f, 1.0f);
-              break;
-            }
-            case 6: /* Buttons */ {
-              if (rInputs[b] == 1) {
-                // Run sensor calibration
-                doCalibration();
-              }
-              if (rInputs[b] == 2) {
-                // Arm the motors
-                if (flightState != STATE_RUNNING) {
-                  flightState = STATE_RUNNING;
-
-                  // Reset PID calculations.
-                  rollErrSum = 0;
-                  lastRollError = 0;
-                  pitchErrSum = 0;
-                  lastPitchError = 0;
-                  yawErrSum = 0;
-                  lastYawError = 0;
-                }
-                else flightState = STATE_MOTORS_INITIALIZED;
-              }
-              if (rInputs[b] == 4) {
-                if (flightState != STATE_RUNNING) {
-                  // Clear sensor values
-                  sensorRoll = 0.0;
-                  sensorPitch = 0.0;
-                  sensorYaw = 0.0;
-                  rollCalibration = 0.0;
-                  pitchCalibration = 0.0;
-                  yawCalibration = 0.0;
-                }
-              }
-              break;
-            }
-          }
-        }
-
-        // Print the results.
-//        printResults();
-
-        // Reset state for next message
-        state = 0;
-      }
-
-      bytesAvailable = radio->available();
+  // Check the heartbeat
+  if (digitalReadFast(HEARTBEAT_PIN)) {
+    if (last_heartbeat == 0) {
+      last_heartbeat = 1;
+      heartbeatTimer = current_time;
     }
-    digitalWrite(LED, LOW);
+  }
+  else if (last_heartbeat == 1) {
+    last_heartbeat = 0;
+  }
+
+  // Channel 1 - Throttle
+  if (digitalReadFast(THROTTLE_CHANNEL_PIN)) {
+    if (last_channel_1 == 0) {
+      last_channel_1 = 1;
+      timer_1 = current_time;
+    }
+  }
+  else if (last_channel_1 == 1) {
+    last_channel_1 = 0;
+    throttle_input = current_time - timer_1;
+  }
+
+  // Channel 2 - Yaw
+  if (digitalReadFast(YAW_CHANNEL_PIN)) {
+    if (last_channel_2 == 0) {
+      last_channel_2 = 1;
+      timer_2 = current_time;
+    }
+  }
+  else if (last_channel_2 == 1) {
+    last_channel_2 = 0;
+    yaw_input = current_time - timer_2;
+  }
+
+  // Channel 3 - Pitch
+  if (digitalReadFast(PITCH_CHANNEL_PIN)) {
+    if (last_channel_3 == 0) {
+      last_channel_3 = 1;
+      timer_3 = current_time;
+    }
+  }
+  else if (last_channel_3 == 1) {
+    last_channel_3 = 0;
+    pitch_input = current_time - timer_3;
+  }
+
+  // Channel 4 - Roll
+  if (digitalReadFast(ROLL_CHANNEL_PIN)) {
+    if (last_channel_4 == 0) {
+      last_channel_4 = 1;
+      timer_4 = current_time;
+    }
+  }
+  else if (last_channel_4 == 1) {
+    last_channel_4 = 0;
+    roll_input = current_time - timer_4;
+  }
+
+  // Arm button
+  if (digitalReadFast(ARM_PIN)) {
+    if (last_arm == 0) {
+      last_arm = 1;
+    }
+  }
+  else if (last_arm == 1) {
+    last_arm = 0;
+    if (flightState != STATE_RUNNING) {
+      flightState = STATE_RUNNING;
+
+      // Reset PID calculations.
+      rollErrSum = 0;
+      lastRollError = 0;
+      pitchErrSum = 0;
+      lastPitchError = 0;
+      yawErrSum = 0;
+      lastYawError = 0;
+    }
+    else {
+      flightState = STATE_MOTORS_INITIALIZED;
+    }
   }
 }
 
 void printResults() {
   Serial.printf(F("Throttle: %4d"), throttle_input);
-/*
-  if (currentPIDAxis == 'r') {
-    Serial.printf(F(", Roll PID - Kp: %4.6f, Ki: %4.6f, Kd: %4.6f"), rollKp, rollKi, rollKd);
-  }
-    Serial.printf(F(", Pitch PID - Kp: %4.6f, Ki: %4.6f, Kd: %4.6f"), pitchKp, pitchKi, pitchKd);
-  }
-  else if (currentPIDAxis == 'y') {
-    Serial.printf(F(", Yaw PID - Kp: %4.6f, Ki: %4.6f, Kd: %4.6f"), yawKp, yawKi, yawKd);
-  }
-*/
-//  Serial.printf(F("    R: %s%4.4f    P: %s%4.4f    Y: %s%4.4f"), rollOutput < 0 ? "-" : "+", abs(rollOutput), pitchOutput < 0 ? "-" : "+", abs(pitchOutput), yawOutput < 0 ? "-" : "+", abs(yawOutput));
-//  Serial.printf(F("    R: %s%4.4f    P: %s%4.4f    Y: %s%4.4f"), rollOutput < 0 ? "-" : "+", abs(rollOutput), pitchOutput < 0 ? "-" : "+", abs(pitchOutput), yawOutput < 0 ? "-" : "+", abs(yawOutput));
-//  Serial.printf(F("    gRollOffset: %s%4.4f    gPitchOffset: %s%4.4f    gYawOffset: %s%4.4f"), gyroRollCalibration < 0 ? "-" : "+", abs(gyroRollCalibration), gyroPitchCalibration < 0 ? "-" : "+", abs(gyroPitchCalibration), gyroYawCalibration < 0 ? "-" : "+", abs(gyroYawCalibration));
-//  Serial.printf(F("    gRoll: %s%4.4f    gPitch: %s%4.4f    gYaw: %s%4.4f"), gyroRoll < 0 ? "-" : "+", abs(gyroRoll), gyroPitch < 0 ? "-" : "+", abs(gyroPitch), gyroYaw < 0 ? "-" : "+", abs(gyroYaw));
-//  Serial.printf(F("    aRollOffset: %s%4.4f    aPitchOffset: %s%4.4f    aYawOffset: %s%4.4f"), accelRollCalibration < 0 ? "-" : "+", abs(accelRollCalibration), accelPitchCalibration < 0 ? "-" : "+", abs(accelPitchCalibration), accelYawCalibration < 0 ? "-" : "+", abs(accelYawCalibration));
-//  Serial.printf(F("    aRoll: %s%4.4f    aPitch: %s%4.4f"), accelRoll < 0 ? "-" : "+", abs(accelRoll), accelPitch < 0 ? "-" : "+", abs(accelPitch));
-//  Serial.printf(F("    sRoll: %s%4.4f    sPitch: %s%4.4f    sYaw: %s%4.4f"), (sensorRoll < 0 ? "-" : "+"), abs(sensorRoll), (sensorPitch < 0 ? "-" : "+"), abs(sensorPitch), (sensorYaw < 0 ? "-" : "+"), abs(sensorYaw));
+  // if (currentPIDAxis == 'r') {
+  //   Serial.printf(F(", Roll PID - Kp: %4.6f, Ki: %4.6f, Kd: %4.6f"), rollKp, rollKi, rollKd);
+  // }
+  //   Serial.printf(F(", Pitch PID - Kp: %4.6f, Ki: %4.6f, Kd: %4.6f"), pitchKp, pitchKi, pitchKd);
+  // }
+  // else if (currentPIDAxis == 'y') {
+  //   Serial.printf(F(", Yaw PID - Kp: %4.6f, Ki: %4.6f, Kd: %4.6f"), yawKp, yawKi, yawKd);
+  // }
+  // Serial.printf(F("    R: %s%4.4f    P: %s%4.4f    Y: %s%4.4f"), rollOutput < 0 ? "-" : "+", abs(rollOutput), pitchOutput < 0 ? "-" : "+", abs(pitchOutput), yawOutput < 0 ? "-" : "+", abs(yawOutput));
+  // Serial.printf(F("    R: %s%4.4f    P: %s%4.4f    Y: %s%4.4f"), rollOutput < 0 ? "-" : "+", abs(rollOutput), pitchOutput < 0 ? "-" : "+", abs(pitchOutput), yawOutput < 0 ? "-" : "+", abs(yawOutput));
+  // Serial.printf(F("    gRollOffset: %s%4.4f    gPitchOffset: %s%4.4f    gYawOffset: %s%4.4f"), gyroRollCalibration < 0 ? "-" : "+", abs(gyroRollCalibration), gyroPitchCalibration < 0 ? "-" : "+", abs(gyroPitchCalibration), gyroYawCalibration < 0 ? "-" : "+", abs(gyroYawCalibration));
+  // Serial.printf(F("    gRoll: %s%4.4f    gPitch: %s%4.4f    gYaw: %s%4.4f"), gyroRoll < 0 ? "-" : "+", abs(gyroRoll), gyroPitch < 0 ? "-" : "+", abs(gyroPitch), gyroYaw < 0 ? "-" : "+", abs(gyroYaw));
+  // Serial.printf(F("    aRollOffset: %s%4.4f    aPitchOffset: %s%4.4f    aYawOffset: %s%4.4f"), accelRollCalibration < 0 ? "-" : "+", abs(accelRollCalibration), accelPitchCalibration < 0 ? "-" : "+", abs(accelPitchCalibration), accelYawCalibration < 0 ? "-" : "+", abs(accelYawCalibration));
+  // Serial.printf(F("    aRoll: %s%4.4f    aPitch: %s%4.4f"), accelRoll < 0 ? "-" : "+", abs(accelRoll), accelPitch < 0 ? "-" : "+", abs(accelPitch));
+  // Serial.printf(F("    sRoll: %s%4.4f    sPitch: %s%4.4f    sYaw: %s%4.4f"), (sensorRoll < 0 ? "-" : "+"), abs(sensorRoll), (sensorPitch < 0 ? "-" : "+"), abs(sensorPitch), (sensorYaw < 0 ? "-" : "+"), abs(sensorYaw));
   Serial.printf(F("    M1: %4d    M2: %4d    M3: %4d    M4: %4d    MaxDelta: %d"), m1_val, m2_val, m3_val, m4_val, maxMotorDelta);
-//  Serial.printf(F("    Roll: %s%4d    Pitch: %s%4d    Yaw: %s%4d"), rollSetPoint < 0 ? "-" : "+", abs(rollSetPoint), pitchSetPoint < 0 ? "-" : "+", abs(pitchSetPoint), yawSetPoint < 0 ? "-" : "+", abs(yawSetPoint));
+  // Serial.printf(F("    Roll: %s%4d    Pitch: %s%4d    Yaw: %s%4d"), rollSetPoint < 0 ? "-" : "+", abs(rollSetPoint), pitchSetPoint < 0 ? "-" : "+", abs(pitchSetPoint), yawSetPoint < 0 ? "-" : "+", abs(yawSetPoint));
   Serial.printf(F("    Motors Armed: %s"), flightState == STATE_RUNNING ? "True" : "False");
   Serial.printf(F("\n"));
-
-/*
-  unsigned char* resp;
-  resp = (unsigned char*)calloc(7, sizeof(unsigned char));
-  resp[0] = 'm';
-  resp[1] = (int)map(throttle_input, 1000, 2000, 0, 255);
-  resp[2] = (int)map(m1_val, 1000, 2000, 0, 255);
-  resp[3] = (int)map(m2_val, 1000, 2000, 0, 255);
-  resp[4] = (int)map(m3_val, 1000, 2000, 0, 255);
-  resp[5] = (int)map(m4_val, 1000, 2000, 0, 255);
-  resp[6] = flightState == STATE_RUNNING ? 1 : 0;
-  radio->write(resp, 7);
-*/
 }
 
 void calculatePID() {
@@ -700,20 +531,6 @@ void calculatePID() {
   if (yawOutput < -YAW_PID_MAX) yawOutput = -YAW_PID_MAX;
   lastYawError = error_tmp;
   Serial.printf(F("R: %4.2f    RSP: %d    RE: %4.4f    RO: %d        P: %4.2f    PSP: %d    PE: %4.4f    PO: %d\n"), sensorRoll, rollSetPoint, rollError, rollOutput, sensorPitch, pitchSetPoint, pitchError, pitchOutput);
-}
-
-// Convert hex to int
-long hex_To_Int(long Hex, char bits) {
-  long hex_2_Int;
-  char byte;
-  hex_2_Int=0;
-
-  for (byte = 0; byte < bits; byte++) {
-     if (Hex&(0x0001 << byte)) hex_2_Int += 1 * (pow(2, byte));
-      else hex_2_Int += 0 * (pow(2, byte));
-  }
-
-  return hex_2_Int;
 }
 
 // Map values from a source domain to a destination domain

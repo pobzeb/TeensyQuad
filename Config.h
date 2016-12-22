@@ -2,9 +2,14 @@
 
 #define DEBUG false
 
-#define RADIO_SERIAL_BAUD_RATE 115200
-
 #define LED 13
+#define HEARTBEAT_PIN 6
+#define THROTTLE_CHANNEL_PIN 7
+#define YAW_CHANNEL_PIN 8
+#define PITCH_CHANNEL_PIN 9
+#define ROLL_CHANNEL_PIN 10
+#define ARM_PIN 11
+
 #define CALIBRATION_SAMPLE_SIZE 2000
 
 // Heartbeat timeout in microseconds
