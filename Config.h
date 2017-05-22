@@ -2,21 +2,21 @@
 
 #define DEBUG false
 
+#define RADIO_SERIAL_BAUD_RATE 115200
+
 #define LED 13
-#define HEARTBEAT_PIN 6
-#define THROTTLE_CHANNEL_PIN 7
-#define YAW_CHANNEL_PIN 8
-#define PITCH_CHANNEL_PIN 9
-#define ROLL_CHANNEL_PIN 10
-#define ARM_PIN 11
+#define CHANNELS 6
+#define THROTTLE_CHANNEL 0
+#define YAW_CHANNEL 1
+#define PITCH_CHANNEL 2
+#define ROLL_CHANNEL 3
+#define TRIM_CHANNEL 4
+#define ARM_CHANNEL 5
 
 #define CALIBRATION_SAMPLE_SIZE 2000
 
 // Heartbeat timeout in milliseconds
-#define HEARTBEAT_TIMEOUT 2500
-
-// Status transmit timeout in milliseconds
-#define STATUS_TX_TIMEOUT 50
+#define HEARTBEAT_TIMEOUT 500
 
 #define LOOP_DT 0.004F // Loop rate delta in ms.
 
@@ -35,8 +35,8 @@
 #define M3_PIN 21
 #define M4_PIN 20
 
-#define MIN_MOTOR_VALUE 1010
-#define MAX_MOTOR_VALUE 1860
+#define MIN_MOTOR_VALUE 1000
+#define MAX_MOTOR_VALUE 2000
 
 //----Sensor/PID Config-------
 
@@ -44,18 +44,17 @@
 
 #define ALPHA 0.8F  // Low pass constant.
 #define GYRO_TRUST 0.98F // Percent Trust for gyro.
-#define STICK_SENSITIVITY 3.5F // Higher value means less sensitive roll, pitch and yaw controll.
 
-#define ROLL_PID_KP   0.650000F
-#define ROLL_PID_KI   0.000000F
+#define ROLL_PID_KP   1.300000F
+#define ROLL_PID_KI   0.550000F
 #define ROLL_PID_KD   0.000000F
 //#define ROLL_PID_KP   0.000000F
 //#define ROLL_PID_KI   0.000000F
 //#define ROLL_PID_KD   0.000000F
 #define ROLL_PID_MAX  400
 
-#define PITCH_PID_KP  0.650000F
-#define PITCH_PID_KI  0.000000F
+#define PITCH_PID_KP  1.300000F
+#define PITCH_PID_KI  0.550000F
 #define PITCH_PID_KD  0.000000F
 //#define PITCH_PID_KP  0.000000F
 //#define PITCH_PID_KI  0.000000F
