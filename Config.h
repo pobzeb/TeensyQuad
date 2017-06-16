@@ -1,7 +1,5 @@
 //-------General Defs-------
 
-#define DEBUG false
-
 #define RADIO_SERIAL_BAUD_RATE 115200
 
 #define LED 13
@@ -13,7 +11,7 @@
 #define TRIM_CHANNEL 4
 #define ARM_CHANNEL 5
 
-#define CALIBRATION_SAMPLE_SIZE 2000
+#define CALIBRATION_SAMPLE_SIZE 500
 
 // Heartbeat timeout in milliseconds
 #define HEARTBEAT_TIMEOUT 500
@@ -28,8 +26,6 @@
 
 //---------Motor Defs--------
 
-#define MOTORS true
-
 #define M1_PIN 23
 #define M2_PIN 22
 #define M3_PIN 21
@@ -40,32 +36,21 @@
 
 //----Sensor/PID Config-------
 
-#define SENSORS true
-
 #define ALPHA 0.8F  // Low pass constant.
 #define GYRO_TRUST 0.98F // Percent Trust for gyro.
 
-#define ROLL_PID_KP   1.300000F
-#define ROLL_PID_KI   0.550000F
-#define ROLL_PID_KD   0.000000F
-//#define ROLL_PID_KP   0.000000F
-//#define ROLL_PID_KI   0.000000F
-//#define ROLL_PID_KD   0.000000F
+#define ROLL_PID_KP   0.000000F
+#define ROLL_PID_KI   0.000000F
+#define ROLL_PID_KD  15.000000F
 #define ROLL_PID_MAX  400
 
-#define PITCH_PID_KP  1.300000F
-#define PITCH_PID_KI  0.550000F
-#define PITCH_PID_KD  0.000000F
-//#define PITCH_PID_KP  0.000000F
-//#define PITCH_PID_KI  0.000000F
-//#define PITCH_PID_KD  0.000000F
+#define PITCH_PID_KP  0.000000F
+#define PITCH_PID_KI  0.000000F
+#define PITCH_PID_KD 15.000000F
 #define PITCH_PID_MAX 400
 
-//#define YAW_PID_KP    6.600000F
-//#define YAW_PID_KI    0.000000F
-//#define YAW_PID_KD   15.000000F
-#define YAW_PID_KP    0.000000F
-#define YAW_PID_KI    0.000000F
+#define YAW_PID_KP    4.000000F
+#define YAW_PID_KI    0.020000F
 #define YAW_PID_KD    0.000000F
-#define YAW_PID_MAX   0
+#define YAW_PID_MAX   400
 
