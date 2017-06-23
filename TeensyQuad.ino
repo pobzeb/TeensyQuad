@@ -259,14 +259,14 @@ void readGyroOnly() {
 void readGyro() {
   gyro.read();
 
-  gyroRollRaw = gyro.g.y;
+  gyroRollRaw  = gyro.g.y;
   gyroPitchRaw = gyro.g.x * -1;
-  gyroYawRaw = gyro.g.z * -1;
+  gyroYawRaw   = gyro.g.z * -1;
 
   // Convert to dps and calculate time delta.
-  gyroRollRaw  = (gyroRollRaw  / 57.14286) * LOOP_DT;
-  gyroPitchRaw = (gyroPitchRaw / 57.14286) * LOOP_DT;
-  gyroYawRaw   = (gyroYawRaw   / 57.14286) * LOOP_DT;
+  gyroRollRaw  = (gyroRollRaw  * 8.75) / 1000.0;
+  gyroPitchRaw = (gyroPitchRaw * 8.75) / 1000.0;
+  gyroYawRaw   = (gyroYawRaw   * 8.75) / 1000.0;
 
   // Final values are angle change in degrees for the time delta.
 }
@@ -334,7 +334,7 @@ void loop() {
 
   // Read the radio input.
   readRadio();
-  pidVal = rc.channel[TRIM_CHANNEL] * 0.2;
+  pidVal = rc.channel[TRIM_CHANNEL] * 0.01;
 
   // Check to see if the motors should be armed or not.
   if (rc.channel[ARM_CHANNEL] == MAX_MOTOR_VALUE && flightState != STATE_RUNNING) {
@@ -345,7 +345,7 @@ void loop() {
     flightState = STATE_MOTORS_INITIALIZED;
   }
 
-  float rate = 300.0;
+  float rate = 3.0;
 
   // Roll Setpoint for PID.
   rollSetPoint = 0;
@@ -490,11 +490,11 @@ void printResults() {
 //  Serial.printf(F("    gRoll: %s%4.4f    gPitch: %s%4.4f    gYaw: %s%4.4f"), gyroRoll < 0 ? "-" : "+", abs(gyroRoll), gyroPitch < 0 ? "-" : "+", abs(gyroPitch), gyroYaw < 0 ? "-" : "+", abs(gyroYaw));
   // Serial.printf(F("    aRollOffset: %s%4.4f    aPitchOffset: %s%4.4f    aYawOffset: %s%4.4f"), accelRollCalibration < 0 ? "-" : "+", abs(accelRollCalibration), accelPitchCalibration < 0 ? "-" : "+", abs(accelPitchCalibration), accelYawCalibration < 0 ? "-" : "+", abs(accelYawCalibration));
   // Serial.printf(F("    aRoll: %s%4.4f    aPitch: %s%4.4f"), accelRoll < 0 ? "-" : "+", abs(accelRoll), accelPitch < 0 ? "-" : "+", abs(accelPitch));
-//  Serial.printf(F("    sRoll: %s%4.4f    sPitch: %s%4.4f    sYaw: %s%4.4f"), (sensorRoll < 0 ? "-" : "+"), abs(sensorRoll), (sensorPitch < 0 ? "-" : "+"), abs(sensorPitch), (sensorYaw < 0 ? "-" : "+"), abs(sensorYaw));
+  Serial.printf(F("    sRoll: %s%4.4f    sPitch: %s%4.4f    sYaw: %s%4.4f"), (sensorRoll < 0 ? "-" : "+"), abs(sensorRoll), (sensorPitch < 0 ? "-" : "+"), abs(sensorPitch), (sensorYaw < 0 ? "-" : "+"), abs(sensorYaw));
   Serial.printf(F("    M1: %4d    M2: %4d    M3: %4d    M4: %4d"), m1_val, m2_val, m3_val, m4_val);
 //  Serial.printf(F("    Roll: %s%4d    Pitch: %s%4d    Yaw: %s%4d"), rc.channel[ROLL_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[ROLL_CHANNEL]), rc.channel[PITCH_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[PITCH_CHANNEL]), rc.channel[YAW_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[YAW_CHANNEL]));
   // Serial.printf(F("    RollSp: %s%4.2f    PitchSp: %s%4.2f    YawSp: %s%4.2f"), rollSetPoint < 0 ? "-" : "+", abs(rollSetPoint), pitchSetPoint < 0 ? "-" : "+", abs(pitchSetPoint), yawSetPoint < 0 ? "-" : "+", abs(yawSetPoint));
-  Serial.printf(F("    RollErr: %s%4.2f    PitchErr: %s%4.2f    YawErr: %s%4.2f"), lastRollError < 0 ? "-" : "+", abs(lastRollError), lastPitchError < 0 ? "-" : "+", abs(lastPitchError), lastYawError < 0 ? "-" : "+", abs(lastYawError));
+//  Serial.printf(F("    RollErr: %s%4.2f    PitchErr: %s%4.2f    YawErr: %s%4.2f"), lastRollError < 0 ? "-" : "+", abs(lastRollError), lastPitchError < 0 ? "-" : "+", abs(lastPitchError), lastYawError < 0 ? "-" : "+", abs(lastYawError));
   Serial.printf(F("    Motors Armed: %s"), flightState == STATE_RUNNING ? "True" : "False");
 //  Serial.printf(F("    HeartbeatPulse: %d"), heartbeatPulse);
   Serial.printf(F("\n"));
@@ -502,7 +502,9 @@ void printResults() {
 
 void calculatePID() {
   // Roll PID
-  rollKp = pidVal;
+//  rollKp = pidVal;
+  rollKi = pidVal;
+//  rollKd = pidVal;
   float rollError = sensorRoll - rollSetPoint;
   rollErrSum += rollKi * rollError;
   if (rollErrSum > ROLL_PID_MAX) rollErrSum = ROLL_PID_MAX;
@@ -514,7 +516,9 @@ void calculatePID() {
   lastRollError = rollError;
 
   // Pitch PID
-  pitchKp = pidVal;
+//  pitchKp = pidVal;
+  pitchKi = pidVal;
+//  pitchKd = pidVal;
   float pitchError = sensorPitch - pitchSetPoint;
   pitchErrSum += pitchKi * pitchError;
   if (pitchErrSum > PITCH_PID_MAX) pitchErrSum = PITCH_PID_MAX;

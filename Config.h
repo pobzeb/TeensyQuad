@@ -39,17 +39,17 @@
 #define ALPHA 0.8F  // Low pass constant.
 #define GYRO_TRUST 0.98F // Percent Trust for gyro.
 
-#define ROLL_PID_KP   0.000000F
+#define ROLL_PID_KP   1.300000F
 #define ROLL_PID_KI   0.000000F
-#define ROLL_PID_KD  15.000000F
+#define ROLL_PID_KD  12.300000F
 #define ROLL_PID_MAX  400
 
-#define PITCH_PID_KP  0.000000F
+#define PITCH_PID_KP  1.300000F
 #define PITCH_PID_KI  0.000000F
-#define PITCH_PID_KD 15.000000F
+#define PITCH_PID_KD 12.300000F
 #define PITCH_PID_MAX 400
 
-#define YAW_PID_KP    4.000000F
+#define YAW_PID_KP    3.000000F
 #define YAW_PID_KI    0.020000F
 #define YAW_PID_KD    0.000000F
 #define YAW_PID_MAX   400
