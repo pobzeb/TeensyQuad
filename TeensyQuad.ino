@@ -334,7 +334,9 @@ void loop() {
 
   // Read the radio input.
   readRadio();
-  pidVal = rc.channel[TRIM_CHANNEL] * 0.01;
+//  pidVal = rc.channel[TRIM_CHANNEL] * 0.2; // P
+//  pidVal = rc.channel[TRIM_CHANNEL] * 0.001; // I
+//  pidVal = rc.channel[TRIM_CHANNEL] * 0.5; // D
 
   // Check to see if the motors should be armed or not.
   if (rc.channel[ARM_CHANNEL] == MAX_MOTOR_VALUE && flightState != STATE_RUNNING) {
@@ -503,7 +505,7 @@ void printResults() {
 void calculatePID() {
   // Roll PID
 //  rollKp = pidVal;
-  rollKi = pidVal;
+//  rollKi = pidVal;
 //  rollKd = pidVal;
   float rollError = sensorRoll - rollSetPoint;
   rollErrSum += rollKi * rollError;
@@ -517,7 +519,7 @@ void calculatePID() {
 
   // Pitch PID
 //  pitchKp = pidVal;
-  pitchKi = pidVal;
+//  pitchKi = pidVal;
 //  pitchKd = pidVal;
   float pitchError = sensorPitch - pitchSetPoint;
   pitchErrSum += pitchKi * pitchError;
