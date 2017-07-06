@@ -40,12 +40,12 @@
 #define GYRO_TRUST 0.98F // Percent Trust for gyro.
 
 #define ROLL_PID_KP   1.700000F
-#define ROLL_PID_KI   0.025000F
+#define ROLL_PID_KI   0.012000F
 #define ROLL_PID_KD  11.000000F
 #define ROLL_PID_MAX  400
 
 #define PITCH_PID_KP  1.700000F
-#define PITCH_PID_KI  0.025000F
+#define PITCH_PID_KI  0.012000F
 #define PITCH_PID_KD 11.000000F
 #define PITCH_PID_MAX 400
 
