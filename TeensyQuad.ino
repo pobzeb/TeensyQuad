@@ -35,8 +35,8 @@ float pidVal = 0.0;
 // Hold sensor values and calibration
 L3G gyro;
 ADXL345 accel;
-HMC5883L compass;
-Adafruit_BMP085 barometer;
+//HMC5883L compass;
+//Adafruit_BMP085 barometer;
 int calIdx = 0;
 float rollCalibration, pitchCalibration, yawCalibration;
 float gyroRollRaw, gyroPitchRaw, gyroYawRaw;
@@ -126,6 +126,7 @@ void Sensors_init() {
   Serial.println(F("Accel initialized"));
   delay(250);
 
+/*
   Serial.println(F("Finding Compass..."));
   compass = HMC5883L();
   int error;
@@ -139,7 +140,9 @@ void Sensors_init() {
   }
   Serial.println(F("Compass initialized"));
   delay(250);
+*/
 
+/*
   Serial.println(F("Finding Barometer..."));
   if (!barometer.begin()) {
     Serial.println(F("Failed to detect barometer!"));
@@ -147,6 +150,7 @@ void Sensors_init() {
   }
   Serial.println(F("Barometer initialized"));
   delay(250);
+*/
 
   // Set the PID values
   rollKp = ROLL_PID_KP;
@@ -278,6 +282,7 @@ void readAccel() {
   // Final values are angle in degrees.
 }
 
+/*
 void readCompass() {
   MagnetometerScaled scaled = compass.ReadScaledAxis();
   heading = atan2(scaled.YAxis, scaled.XAxis);
@@ -288,7 +293,9 @@ void readCompass() {
 
   heading *= RAD_TO_DEG;
 }
+*/
 
+/*
 void readAltitude() {
   // Get altitude in meters.
   altitude = (altitude * 0.98f) + (barometer.readAltitude() * 0.02f);
@@ -297,6 +304,7 @@ void readAltitude() {
   // Get pressure in Pa.
 //  pressure = (pressure * 0.98f) + (barometer.readPressure() * 0.02f);
 }
+*/
 
 void Motors_init() {
   // Adjust the PWM frequency to 250kHz
