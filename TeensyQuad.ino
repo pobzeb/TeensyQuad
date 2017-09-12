@@ -194,16 +194,15 @@ void doCalibration() {
     }
 
     // Read the sensor values
-//    readSensors();
-//    if (calIdx % 4 == 0) readAltitude();
-    readGyroOnly();
+    readSensors();
 
     // Accumulate
     rollCalibration  += sensorRoll;
     pitchCalibration += sensorPitch;
     yawCalibration   += sensorYaw;
 
-    while (micros() - calibrationTimer < 4000);
+    // Wait at least 4ms.
+    while ((loopTime = micros() - calibrationTimer) < 4000);
     calibrationTimer = micros();
   }
 
@@ -218,35 +217,30 @@ void doCalibration() {
 }
 
 void readSensors() {
-  // Read gyro and accel.
-  readGyro();
-  readAccel();
-  readCompass();
+  if (GYRO_ONLY) {
+    // Read gyro.
+    readGyro();
 
-  // Complementary filter to combine gyro and accelerometer.
-  gyroRoll  = GYRO_TRUST * (gyroRoll  + gyroRollRaw)  + (accelRoll  * (1.0 - GYRO_TRUST));
-  gyroPitch = GYRO_TRUST * (gyroPitch + gyroPitchRaw) + (accelPitch * (1.0 - GYRO_TRUST));
-  gyroYaw   = GYRO_TRUST * (gyroYaw   + gyroYawRaw)   + (heading    * (1.0 - GYRO_TRUST));
-
-  sensorRoll  = gyroRoll;
-  sensorPitch = gyroPitch;
-  sensorYaw   = gyroYaw;
-
-  // Add in calibration offsets.
-  if (calIdx == CALIBRATION_SAMPLE_SIZE) {
-    sensorRoll  -= rollCalibration;
-    sensorPitch -= pitchCalibration;
-    sensorYaw   -= yawCalibration;
+    sensorRoll  = gyroRollRaw;
+    sensorPitch = gyroPitchRaw;
+    sensorYaw   = gyroYawRaw;
   }
-}
+  else {
+    // Read gyro and accel.
+    readGyro();
+    readAccel();
+//    readCompass();
 
-void readGyroOnly() {
-  // Read gyro.
-  readGyro();
+    // Complementary filter to combine gyro and accelerometer.
+    gyroRoll  = GYRO_TRUST * (gyroRoll  + gyroRollRaw)  + (accelRoll  * (1.0 - GYRO_TRUST));
+    gyroPitch = GYRO_TRUST * (gyroPitch + gyroPitchRaw) + (accelPitch * (1.0 - GYRO_TRUST));
+    // gyroYaw   = GYRO_TRUST * (gyroYaw   + gyroYawRaw)   + (heading    * (1.0 - GYRO_TRUST));
+    gyroYaw = gyroYawRaw;
 
-  sensorRoll  = gyroRollRaw;
-  sensorPitch = gyroPitchRaw;
-  sensorYaw   = gyroYawRaw;
+    sensorRoll  = gyroRoll;
+    sensorPitch = gyroPitch;
+    sensorYaw   = gyroYaw;
+  }
 
   // Add in calibration offsets.
   if (calIdx == CALIBRATION_SAMPLE_SIZE) {
@@ -329,14 +323,13 @@ void Motors_init() {
 
 void loop() {
   // Read the gyro and calculate the new values
-//  readSensors();
-  readGyroOnly();
+  readSensors();
 
   // Read the radio input.
   readRadio();
-//  pidVal = rc.channel[TRIM_CHANNEL] * 0.2; // P
-//  pidVal = rc.channel[TRIM_CHANNEL] * 0.001; // I
-//  pidVal = rc.channel[TRIM_CHANNEL] * 0.5; // D
+//  pidVal = rc.channel[TRIM_CHANNEL] * 0.2;    // P (Take dial value and reduce by 50%)
+//  pidVal = rc.channel[TRIM_CHANNEL] * 0.01; // I (Take dial value and reduce by 50%)
+//  pidVal = rc.channel[TRIM_CHANNEL];        // D (Take dial value and reduce by 50%)
 
   // Check to see if the motors should be armed or not.
   if (rc.channel[ARM_CHANNEL] == MAX_MOTOR_VALUE && flightState != STATE_RUNNING) {
@@ -347,23 +340,21 @@ void loop() {
     flightState = STATE_MOTORS_INITIALIZED;
   }
 
-  float rate = 3.0;
-
   // Roll Setpoint for PID.
   rollSetPoint = 0;
-  if (rc.channel[ROLL_CHANNEL] > 1508) rollSetPoint = (rc.channel[ROLL_CHANNEL] - 1508) / rate;
-  else if (rc.channel[ROLL_CHANNEL] < 1492) rollSetPoint = (rc.channel[ROLL_CHANNEL] - 1492) / rate;
+  if (rc.channel[ROLL_CHANNEL] > 1508) rollSetPoint = (rc.channel[ROLL_CHANNEL] - 1508) / 3.0;
+  else if (rc.channel[ROLL_CHANNEL] < 1492) rollSetPoint = (rc.channel[ROLL_CHANNEL] - 1492) / 3.0;
 
   // Pitch Setpoint for PID.
   pitchSetPoint = 0;
-  if (rc.channel[PITCH_CHANNEL] > 1508) pitchSetPoint = (rc.channel[PITCH_CHANNEL] - 1508) / rate;
-  else if (rc.channel[PITCH_CHANNEL] < 1492) pitchSetPoint = (rc.channel[PITCH_CHANNEL] - 1492) / rate;
+  if (rc.channel[PITCH_CHANNEL] > 1508) pitchSetPoint = (rc.channel[PITCH_CHANNEL] - 1508) / 3.0;
+  else if (rc.channel[PITCH_CHANNEL] < 1492) pitchSetPoint = (rc.channel[PITCH_CHANNEL] - 1492) / 3.0;
 
   // Yaw Setpoint for PID.
   yawSetPoint = 0;
   if (rc.channel[THROTTLE_CHANNEL] > 1050) {
-    if (rc.channel[YAW_CHANNEL] > 1508) yawSetPoint = (rc.channel[YAW_CHANNEL] - 1508) / 10.0;
-    else if (rc.channel[YAW_CHANNEL] < 1492) yawSetPoint = (rc.channel[YAW_CHANNEL] - 1492) / 10.0;
+    if (rc.channel[YAW_CHANNEL] > 1508) yawSetPoint = (rc.channel[YAW_CHANNEL] - 1508) / 3.0;
+    else if (rc.channel[YAW_CHANNEL] < 1492) yawSetPoint = (rc.channel[YAW_CHANNEL] - 1492) / 3.0;
   }
 
   // Check the heartbeat pulse is greater than the timeout
@@ -431,10 +422,6 @@ void loop() {
   m2.writeMicroseconds(m2_val);
   m3.writeMicroseconds(m3_val);
   m4.writeMicroseconds(m4_val);
-  // m1.write(map(m1_val, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE, 0, 179));
-  // m2.write(map(m2_val, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE, 0, 179));
-  // m3.write(map(m3_val, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE, 0, 179));
-  // m4.write(map(m4_val, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE, 0, 179));
 }
 
 void resetPID() {
@@ -490,12 +477,12 @@ void printResults() {
   Serial.printf(F("    Throttle: %4d"), throttle);
 //  Serial.printf(F("    R: %s%4.4f    P: %s%4.4f    Y: %s%4.4f"), rollOutput < 0 ? "-" : "+", abs(rollOutput), pitchOutput < 0 ? "-" : "+", abs(pitchOutput), yawOutput < 0 ? "-" : "+", abs(yawOutput));
 //  Serial.printf(F("    gRoll: %s%4.4f    gPitch: %s%4.4f    gYaw: %s%4.4f"), gyroRoll < 0 ? "-" : "+", abs(gyroRoll), gyroPitch < 0 ? "-" : "+", abs(gyroPitch), gyroYaw < 0 ? "-" : "+", abs(gyroYaw));
-  // Serial.printf(F("    aRollOffset: %s%4.4f    aPitchOffset: %s%4.4f    aYawOffset: %s%4.4f"), accelRollCalibration < 0 ? "-" : "+", abs(accelRollCalibration), accelPitchCalibration < 0 ? "-" : "+", abs(accelPitchCalibration), accelYawCalibration < 0 ? "-" : "+", abs(accelYawCalibration));
-  // Serial.printf(F("    aRoll: %s%4.4f    aPitch: %s%4.4f"), accelRoll < 0 ? "-" : "+", abs(accelRoll), accelPitch < 0 ? "-" : "+", abs(accelPitch));
+//  Serial.printf(F("    aRollOffset: %s%4.4f    aPitchOffset: %s%4.4f    aYawOffset: %s%4.4f"), accelRollCalibration < 0 ? "-" : "+", abs(accelRollCalibration), accelPitchCalibration < 0 ? "-" : "+", abs(accelPitchCalibration), accelYawCalibration < 0 ? "-" : "+", abs(accelYawCalibration));
+//  Serial.printf(F("    aRoll: %s%4.4f    aPitch: %s%4.4f"), accelRoll < 0 ? "-" : "+", abs(accelRoll), accelPitch < 0 ? "-" : "+", abs(accelPitch));
   Serial.printf(F("    sRoll: %s%4.4f    sPitch: %s%4.4f    sYaw: %s%4.4f"), (sensorRoll < 0 ? "-" : "+"), abs(sensorRoll), (sensorPitch < 0 ? "-" : "+"), abs(sensorPitch), (sensorYaw < 0 ? "-" : "+"), abs(sensorYaw));
-  Serial.printf(F("    M1: %4d    M2: %4d    M3: %4d    M4: %4d"), m1_val, m2_val, m3_val, m4_val);
+//  Serial.printf(F("    M1: %4d    M2: %4d    M3: %4d    M4: %4d"), m1_val, m2_val, m3_val, m4_val);
 //  Serial.printf(F("    Roll: %s%4d    Pitch: %s%4d    Yaw: %s%4d"), rc.channel[ROLL_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[ROLL_CHANNEL]), rc.channel[PITCH_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[PITCH_CHANNEL]), rc.channel[YAW_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[YAW_CHANNEL]));
-  // Serial.printf(F("    RollSp: %s%4.2f    PitchSp: %s%4.2f    YawSp: %s%4.2f"), rollSetPoint < 0 ? "-" : "+", abs(rollSetPoint), pitchSetPoint < 0 ? "-" : "+", abs(pitchSetPoint), yawSetPoint < 0 ? "-" : "+", abs(yawSetPoint));
+//  Serial.printf(F("    RollSp: %s%4.2f    PitchSp: %s%4.2f    YawSp: %s%4.2f"), rollSetPoint < 0 ? "-" : "+", abs(rollSetPoint), pitchSetPoint < 0 ? "-" : "+", abs(pitchSetPoint), yawSetPoint < 0 ? "-" : "+", abs(yawSetPoint));
 //  Serial.printf(F("    RollErr: %s%4.2f    PitchErr: %s%4.2f    YawErr: %s%4.2f"), lastRollError < 0 ? "-" : "+", abs(lastRollError), lastPitchError < 0 ? "-" : "+", abs(lastPitchError), lastYawError < 0 ? "-" : "+", abs(lastYawError));
   Serial.printf(F("    Motors Armed: %s"), flightState == STATE_RUNNING ? "True" : "False");
 //  Serial.printf(F("    HeartbeatPulse: %d"), heartbeatPulse);
@@ -532,7 +519,6 @@ void calculatePID() {
   lastPitchError = pitchError;
 
   // Yaw PID
-//  yawKp = pidVal;
   float yawError = sensorYaw - yawSetPoint;
   yawErrSum += yawKi * yawError;
   if (yawErrSum > YAW_PID_MAX) yawErrSum = YAW_PID_MAX;

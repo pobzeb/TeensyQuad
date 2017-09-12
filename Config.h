@@ -11,7 +11,7 @@
 #define TRIM_CHANNEL 4
 #define ARM_CHANNEL 5
 
-#define CALIBRATION_SAMPLE_SIZE 500
+#define CALIBRATION_SAMPLE_SIZE 1000
 
 // Heartbeat timeout in milliseconds
 #define HEARTBEAT_TIMEOUT 500
@@ -36,17 +36,22 @@
 
 //----Sensor/PID Config-------
 
+// If this value is true, only read the
+// gyro sensor. Otherwise, run a combination
+// filter on accel and gyro data.
+#define GYRO_ONLY true
+
 #define ALPHA 0.8F  // Low pass constant.
 #define GYRO_TRUST 0.98F // Percent Trust for gyro.
 
-#define ROLL_PID_KP   1.700000F
-#define ROLL_PID_KI   0.012000F
-#define ROLL_PID_KD  11.000000F
+#define ROLL_PID_KP   1.200000F
+#define ROLL_PID_KI   0.010000F
+#define ROLL_PID_KD   8.000000F
 #define ROLL_PID_MAX  400
 
-#define PITCH_PID_KP  1.700000F
-#define PITCH_PID_KI  0.012000F
-#define PITCH_PID_KD 11.000000F
+#define PITCH_PID_KP  1.200000F
+#define PITCH_PID_KI  0.010000F
+#define PITCH_PID_KD  8.000000F
 #define PITCH_PID_MAX 400
 
 #define YAW_PID_KP    3.000000F
