@@ -1,8 +1,6 @@
 #include <Wire.h>
 //#include <EEPROM.h>
 
-//#include "TeensyQuad.h"
-//#include "PID.h"
 #include "Config.h"
 
 #include <L3G.h>
