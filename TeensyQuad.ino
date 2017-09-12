@@ -6,7 +6,7 @@
 #include <L3G.h>
 #include <ADXL345.h>
 #include <HMC5883L.h>
-#include <Adafruit_BMP085.h>
+//#include <Adafruit_BMP085.h>
 #include <Servo.h>
 
 // Radio input values.
