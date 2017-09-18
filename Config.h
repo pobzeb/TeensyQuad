@@ -16,7 +16,7 @@
 // Heartbeat timeout in milliseconds
 #define HEARTBEAT_TIMEOUT 500
 
-#define LOOP_DT 0.004F // Loop rate delta in ms.
+#define LOOP_DT 4000 // Loop rate delta in micro seconds.
 
 //------Motor State Defs-----
 
@@ -40,22 +40,43 @@
 // gyro sensor. Otherwise, run a combination
 // filter on accel and gyro data.
 #define GYRO_ONLY true
+#define ABSOLUTE_ANGLE false
+
+// +/-  250 dps =  8.75
+// +/-  500 dps = 17.50
+// +/- 2000 dps = 70.00
+#define GYRO_SENSITIVITY 17.50 / 1000
 
 #define ALPHA 0.8F  // Low pass constant.
 #define GYRO_TRUST 0.98F // Percent Trust for gyro.
 
-#define ROLL_PID_KP   1.200000F
-#define ROLL_PID_KI   0.010000F
-#define ROLL_PID_KD   8.000000F
-#define ROLL_PID_MAX  400
+// Controller Sensitivity.
+#define CONTROLER_SENSITIVITY 5.0F
 
-#define PITCH_PID_KP  1.200000F
-#define PITCH_PID_KI  0.010000F
-#define PITCH_PID_KD  8.000000F
+#if ABSOLUTE_ANGLE
+  #define ROLL_PID_KP   3.500000F
+  #define ROLL_PID_KI   0.000000F
+  #define ROLL_PID_KD  18.000000F
+  #define ROLL_PID_MAX  400
+
+  #define YAW_PID_KP    4.000000F
+  #define YAW_PID_KI    0.020000F
+  #define YAW_PID_KD    0.000000F
+  #define YAW_PID_MAX   400
+#else
+  #define ROLL_PID_KP   0.000000F
+  #define ROLL_PID_KI   0.000000F
+  #define ROLL_PID_KD   3.500000F
+  #define ROLL_PID_MAX  400
+
+  #define YAW_PID_KP    3.000000F
+  #define YAW_PID_KI    0.020000F
+  #define YAW_PID_KD    0.000000F
+  #define YAW_PID_MAX   400
+#endif
+
+#define PITCH_PID_KP  ROLL_PID_KP
+#define PITCH_PID_KI  ROLL_PID_KI
+#define PITCH_PID_KD  ROLL_PID_KD
 #define PITCH_PID_MAX 400
-
-#define YAW_PID_KP    3.000000F
-#define YAW_PID_KI    0.020000F
-#define YAW_PID_KD    0.000000F
-#define YAW_PID_MAX   400
 
