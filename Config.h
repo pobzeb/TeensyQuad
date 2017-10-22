@@ -16,8 +16,6 @@
 // Heartbeat timeout in milliseconds
 #define HEARTBEAT_TIMEOUT 500
 
-#define LOOP_DT 4000 // Loop rate delta in micro seconds.
-
 //------Motor State Defs-----
 
 #define STATE_WAITING_FOR_INIT    0
@@ -45,38 +43,48 @@
 // +/-  250 dps =  8.75
 // +/-  500 dps = 17.50
 // +/- 2000 dps = 70.00
-#define GYRO_SENSITIVITY 17.50 / 1000
+#define GYRO_SENSITIVITY 17.50
+
+// Calculate the loop rate and time delta
+#define LOOP_RATE   250.0 // MHz or 4ms per loop
+#define LOOP_DT     1000.0 / LOOP_RATE
+
+// Calculate the gyro raw to deg/sec constant
+#define GYRO_DEG_SEC_CONST GYRO_SENSITIVITY / 1000.0
+
+// Calculate absolute angle
+#define GYRO_ANGLE_CONST (1 / LOOP_RATE) / GYRO_SENSITIVITY
+#define GYRO_ANGLE_RAD_CONST (GYRO_ANGLE_CONST * (3.142 / 180.0))
 
 #define ALPHA 0.8F  // Low pass constant.
-#define GYRO_TRUST 0.98F // Percent Trust for gyro.
+#define GYRO_TRUST 0.7F // Percent Trust for gyro.
 
 // Controller Sensitivity.
-#define CONTROLER_SENSITIVITY 5.0F
+#if ABSOLUTE_ANGLE
+  #define CONTROLER_SENSITIVITY 11.0F
+#else
+  #define CONTROLER_SENSITIVITY 3.0F
+#endif
 
 #if ABSOLUTE_ANGLE
-  #define ROLL_PID_KP   3.500000F
-  #define ROLL_PID_KI   0.000000F
-  #define ROLL_PID_KD  18.000000F
-  #define ROLL_PID_MAX  400
-
-  #define YAW_PID_KP    4.000000F
-  #define YAW_PID_KI    0.020000F
-  #define YAW_PID_KD    0.000000F
-  #define YAW_PID_MAX   400
+  #define ROLL_PID_KP   1.300000F
+  #define ROLL_PID_KI   0.010000F
+  #define ROLL_PID_KD   8.000000F
 #else
-  #define ROLL_PID_KP   0.000000F
-  #define ROLL_PID_KI   0.000000F
-  #define ROLL_PID_KD   3.500000F
-  #define ROLL_PID_MAX  400
-
-  #define YAW_PID_KP    3.000000F
-  #define YAW_PID_KI    0.020000F
-  #define YAW_PID_KD    0.000000F
-  #define YAW_PID_MAX   400
+  #define ROLL_PID_KP   1.030000F
+  #define ROLL_PID_KI   0.010000F
+  #define ROLL_PID_KD   0.400000F
 #endif
 
 #define PITCH_PID_KP  ROLL_PID_KP
 #define PITCH_PID_KI  ROLL_PID_KI
 #define PITCH_PID_KD  ROLL_PID_KD
+
+#define YAW_PID_KP    3.000000F
+#define YAW_PID_KI    0.020000F
+#define YAW_PID_KD    0.000000F
+
+#define ROLL_PID_MAX  400
 #define PITCH_PID_MAX 400
+#define YAW_PID_MAX   400
 

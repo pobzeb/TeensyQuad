@@ -28,19 +28,22 @@ struct RC_Channel rc;
 float rollErrSum,   rollKp,   rollKi,   rollKd,   lastRollError;
 float pitchErrSum,  pitchKp,  pitchKi,  pitchKd,  lastPitchError;
 float yawErrSum,    yawKp,    yawKi,    yawKd,    lastYawError;
-float rollSetPoint = 0, pitchSetPoint = 0, yawSetPoint = 0;
-float throttle = 0, rollOutput = 0, pitchOutput = 0, yawOutput = 0;
+int rollSetPoint = 0, pitchSetPoint = 0, yawSetPoint = 0;
+int throttle = 0, rollOutput = 0, pitchOutput = 0, yawOutput = 0;
 float pidVal = 0.0;
 
 // Hold sensor values and calibration
 L3G gyro;
-ADXL345 accel;
+//ADXL345 accel;
 //HMC5883L compass;
 //Adafruit_BMP085 barometer;
 int calIdx = 0;
+boolean calibrated = false;
 float rollCalibration, pitchCalibration, yawCalibration;
-float gyroRoll, gyroPitch, gyroYaw;
+double gyroRoll, gyroPitch, gyroYaw;
+float gyroRollInput, gyroPitchInput, gyroYawInput;
 float accelRoll, accelPitch, accelYaw;
+float angleRoll, anglePitch;
 float heading;
 float sensorRoll, sensorPitch, sensorYaw;
 float altitude, temperature;
@@ -107,14 +110,15 @@ void Sensors_init() {
   //  10 -  50Hz Bandwidth
   //   1 - Normal Mode (not power down mode)
   // 111 - Z, Y and X axis enabled
-  gyro.writeReg(L3G::CTRL_REG1, 0xAF); // 0b10101111
+  gyro.writeReg(L3G::CTRL_REG1, 0b10101111); // 0b10101111
   // Using +/-  250 dps full scale = 1000
   // Using +/-  500 dps full scale = 1001
   // Using +/- 2000 dps full scale = 1010
-  gyro.writeReg(L3G::CTRL_REG4, 0x90); // 0b10010000
+  gyro.writeReg(L3G::CTRL_REG4, 0b10010000); // 0b10010000
   Serial.println(F("Gyro initialized"));
   delay(250);
 
+/*
   Serial.println(F("Finding Accel..."));
   if (!accel.begin()) {
     Serial.println(F("Failed to detect accelerometer!"));
@@ -124,6 +128,7 @@ void Sensors_init() {
   accel.setDataRate(ADXL345_DATARATE_400HZ);
   Serial.println(F("Accel initialized"));
   delay(250);
+*/
 
 /*
   Serial.println(F("Finding Compass..."));
@@ -178,6 +183,8 @@ void doCalibration() {
   gyroRoll   = 0;
   gyroPitch  = 0;
   gyroYaw    = 0;
+  anglePitch = 0;
+  angleRoll  = 0;
   accelRoll  = 0;
   accelPitch = 0;
   accelYaw   = 0;
@@ -202,9 +209,9 @@ void doCalibration() {
     pitchCalibration += gyroPitch;
     yawCalibration   += gyroYaw;
 
-    // Wait at least 4ms.
-    while (micros() - calibrationTimer < LOOP_DT);
-    calibrationTimer = micros();
+    // Wait at least 10ms.
+    while (millis() - calibrationTimer < LOOP_DT);
+    calibrationTimer = millis();
   }
 
   // Get an average
@@ -214,6 +221,7 @@ void doCalibration() {
 
   Serial.print(F("...Done\n"));
   Serial.println(F("Calibration complete."));
+  calibrated = true;
   digitalWrite(LED, LOW);
 }
 
@@ -222,28 +230,39 @@ void readSensors() {
     // Read gyro.
     readGyro();
 
+    // Get gyro values in deg/sec.
+    gyroRollInput   = (gyroRollInput  * GYRO_TRUST) + (GYRO_DEG_SEC_CONST * gyroRoll  * (1.0 - GYRO_TRUST));
+    gyroPitchInput  = (gyroPitchInput * GYRO_TRUST) + (GYRO_DEG_SEC_CONST * gyroPitch * (1.0 - GYRO_TRUST));
+    gyroYawInput    = (gyroYawInput   * GYRO_TRUST) + (GYRO_DEG_SEC_CONST * gyroYaw   * (1.0 - GYRO_TRUST));
+
     // Get the gyro data in degrees.
     if (ABSOLUTE_ANGLE == true) {
-      sensorRoll  += (gyroRoll  * 0.004);
-      sensorPitch += (gyroPitch * 0.004);
-      sensorYaw   += (gyroYaw   * 0.004);
+      // Get the angle
+      anglePitch += gyroPitch * GYRO_ANGLE_CONST;
+      angleRoll  += gyroRoll  * GYRO_ANGLE_CONST;
+      anglePitch -= angleRoll  * sin(gyroYaw * GYRO_ANGLE_RAD_CONST);
+      angleRoll  += anglePitch * sin(gyroYaw * GYRO_ANGLE_RAD_CONST);
+
+      sensorRoll   = angleRoll;
+      sensorPitch  = anglePitch;
+      sensorYaw    = GYRO_DEG_SEC_CONST * gyroYaw;
     }
     else {
-      sensorRoll  = gyroRoll;
-      sensorPitch = gyroPitch;
-      sensorYaw   = gyroYaw;
+      sensorRoll  = GYRO_DEG_SEC_CONST * gyroRoll;
+      sensorPitch = GYRO_DEG_SEC_CONST * gyroPitch;
+      sensorYaw   = GYRO_DEG_SEC_CONST * gyroYaw;
     }
   }
   else {
     // Read gyro and accel.
     readGyro();
-    readAccel();
+//    readAccel();
 //    readCompass();
 
     // Complementary filter to combine gyro and accelerometer.
-    sensorRoll  = GYRO_TRUST * (sensorRoll  + gyroRoll  * 0.004) + (accelRoll  * (1.0 - GYRO_TRUST));
-    sensorPitch = GYRO_TRUST * (sensorPitch + gyroPitch * 0.004) + (accelPitch * (1.0 - GYRO_TRUST));
-//    sensorYaw   = GYRO_TRUST * (sensorYaw   + gyroYaw   * 0.004) + (heading    * (1.0 - GYRO_TRUST));
+    sensorRoll  = GYRO_TRUST * (sensorRoll  + gyroRoll  / LOOP_RATE) + (accelRoll  * (1.0 - GYRO_TRUST));
+    sensorPitch = GYRO_TRUST * (sensorPitch + gyroPitch / LOOP_RATE) + (accelPitch * (1.0 - GYRO_TRUST));
+//    sensorYaw   = GYRO_TRUST * (sensorYaw   + gyroYaw) + (heading    * (1.0 - GYRO_TRUST));
     sensorYaw = gyroYaw;
   }
 }
@@ -251,10 +270,10 @@ void readSensors() {
 void readGyro() {
   gyro.read();
 
-  // Get raw gyro values in deg/sec.
-  gyroRoll  = (gyro.g.y     ) * GYRO_SENSITIVITY;
-  gyroPitch = (gyro.g.x * -1) * GYRO_SENSITIVITY;
-  gyroYaw   = (gyro.g.z * -1) * GYRO_SENSITIVITY;
+  // Get raw gyro values and convert to deg/sec.
+  gyroRoll  = gyro.g.y;
+  gyroPitch = gyro.g.x * -1;
+  gyroYaw   = gyro.g.z * -1;
 
   // Adjust by calibration offsets.
   if (calIdx == CALIBRATION_SAMPLE_SIZE) {
@@ -264,6 +283,7 @@ void readGyro() {
   }
 }
 
+/*
 void readAccel() {
   Vector norm = accel.readNormalize();
   Vector filtered = accel.lowPassFilter(norm, ALPHA);
@@ -278,6 +298,7 @@ void readAccel() {
 
   // Final values are angle in degrees.
 }
+*/
 
 /*
 void readCompass() {
@@ -304,8 +325,6 @@ void readAltitude() {
 */
 
 void Motors_init() {
-  // Adjust the PWM frequency to 250kHz
-  
   // Attach the motors
   m1.attach(M1_PIN, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE);
   m2.attach(M2_PIN, MIN_MOTOR_VALUE, MAX_MOTOR_VALUE);
@@ -332,15 +351,19 @@ void loop() {
   readRadio();
 //  pidVal = rc.channel[TRIM_CHANNEL] * 0.2;  // P (Take dial value and reduce by 50%)
 //  pidVal = rc.channel[TRIM_CHANNEL] * 0.01; // I (Take dial value and reduce by 50%)
-//  pidVal = rc.channel[TRIM_CHANNEL];        // D (Take dial value and reduce by 50%)
+//  pidVal = rc.channel[TRIM_CHANNEL] * 0.1;  // D (Take dial value and reduce by 50%)
+
+  // Set the throttle.
+  throttle = rc.channel[THROTTLE_CHANNEL];
 
   // Check to see if the motors should be armed or not.
   if (rc.channel[ARM_CHANNEL] == MAX_MOTOR_VALUE && flightState != STATE_RUNNING) {
     flightState = STATE_RUNNING;
-    resetPID();
   }
   else if (rc.channel[ARM_CHANNEL] == MIN_MOTOR_VALUE) {
     flightState = STATE_MOTORS_INITIALIZED;
+    resetPID();
+    if (!calibrated) doCalibration();
   }
 
   // Roll Setpoint for PID.
@@ -355,7 +378,7 @@ void loop() {
 
   // Yaw Setpoint for PID.
   yawSetPoint = 0;
-  if (rc.channel[THROTTLE_CHANNEL] > 1050) {
+  if (throttle > 1050) {
     if (rc.channel[YAW_CHANNEL] > 1508) yawSetPoint = (rc.channel[YAW_CHANNEL] - 1508) / CONTROLER_SENSITIVITY;
     else if (rc.channel[YAW_CHANNEL] < 1492) yawSetPoint = (rc.channel[YAW_CHANNEL] - 1492) / CONTROLER_SENSITIVITY;
   }
@@ -367,9 +390,6 @@ void loop() {
     heartbeatPulse = HEARTBEAT_TIMEOUT + 1;
   }
 
-  // Set the throttle.
-  throttle = rc.channel[THROTTLE_CHANNEL];
-
   if (flightState == STATE_RUNNING) {
     // Leave padding for pid values.
     if (throttle > 1800) throttle = 1800;
@@ -378,6 +398,7 @@ void loop() {
     if (throttle > 1080) {
       // Calculate the pid motor values
       calculatePID();
+      calibrated = false;
     }
     else {
       resetPID();
@@ -414,9 +435,9 @@ void loop() {
     m4_val = MIN_MOTOR_VALUE;
   }
 
-  // Wait at least 4ms.
-  while ((loopTime = micros() - loopTimer) < LOOP_DT);
-  loopTimer = micros();
+  // Wait at least 10ms.
+  while ((loopTime = millis() - loopTimer) < LOOP_DT);
+  loopTimer = millis();
 
   // Print the results.
   printResults();
@@ -479,27 +500,32 @@ void readRadio() {
 void printResults() {
   Serial.printf(F("Loop: %3d"), loopTime);
   Serial.printf(F("    Throttle: %4d"), throttle);
-//  Serial.printf(F("    Kp: %4.4f    Ki: %4.4f    Kd: %4.4f"), rollKp , rollKi, rollKd);
-//  Serial.printf(F("    R: %s%4.4f    P: %s%4.4f    Y: %s%4.4f"), rollOutput < 0 ? "-" : "+", abs(rollOutput), pitchOutput < 0 ? "-" : "+", abs(pitchOutput), yawOutput < 0 ? "-" : "+", abs(yawOutput));
-//  Serial.printf(F("    aRollOffset: %s%4.4f    aPitchOffset: %s%4.4f    aYawOffset: %s%4.4f"), accelRollCalibration < 0 ? "-" : "+", abs(accelRollCalibration), accelPitchCalibration < 0 ? "-" : "+", abs(accelPitchCalibration), accelYawCalibration < 0 ? "-" : "+", abs(accelYawCalibration));
-//  Serial.printf(F("    aRoll: %s%4.4f    aPitch: %s%4.4f"), accelRoll < 0 ? "-" : "+", abs(accelRoll), accelPitch < 0 ? "-" : "+", abs(accelPitch));
-//  Serial.printf(F("    Roll: %s%4.4f    Pitch: %s%4.4f    Yaw: %s%4.4f"), (sensorRoll < 0 ? "-" : "+"), abs(sensorRoll), (sensorPitch < 0 ? "-" : "+"), abs(sensorPitch), (sensorYaw < 0 ? "-" : "+"), abs(sensorYaw));
-//  Serial.printf(F("    ROffset: %s%4.4f    POffset: %s%4.4f    YOffset: %s%4.4f"), (rollCalibration < 0 ? "-" : "+"), abs(rollCalibration), (pitchCalibration < 0 ? "-" : "+"), abs(pitchCalibration), (yawCalibration < 0 ? "-" : "+"), abs(yawCalibration));
+////  Serial.printf(F("    Kp: %4.4f    Ki: %4.4f    Kd: %4.4f"), rollKp , rollKi, rollKd);
+////  Serial.printf(F("    R: %s%4.4f    P: %s%4.4f    Y: %s%4.4f"), rollOutput < 0 ? "-" : "+", abs(rollOutput), pitchOutput < 0 ? "-" : "+", abs(pitchOutput), yawOutput < 0 ? "-" : "+", abs(yawOutput));
+////  Serial.printf(F("    aRollOffset: %s%4.4f    aPitchOffset: %s%4.4f    aYawOffset: %s%4.4f"), accelRollCalibration < 0 ? "-" : "+", abs(accelRollCalibration), accelPitchCalibration < 0 ? "-" : "+", abs(accelPitchCalibration), accelYawCalibration < 0 ? "-" : "+", abs(accelYawCalibration));
+////  Serial.printf(F("    aRoll: %s%4.4f    aPitch: %s%4.4f"), accelRoll < 0 ? "-" : "+", abs(accelRoll), accelPitch < 0 ? "-" : "+", abs(accelPitch));
+  Serial.printf(F("    gRoll: %s%4.4f    gPitch: %s%4.4f    gYaw: %s%4.4f"), (gyroRollInput < 0 ? "-" : "+"), abs(gyroRollInput), (gyroPitchInput < 0 ? "-" : "+"), abs(gyroPitchInput), (gyroYawInput < 0 ? "-" : "+"), abs(gyroYawInput));
+  Serial.printf(F("    aglRoll: %s%4.4f    aglPitch: %s%4.4f"), (angleRoll < 0 ? "-" : "+"), abs(angleRoll), (anglePitch < 0 ? "-" : "+"), abs(anglePitch));
+  Serial.printf(F("    Roll: %s%4.4f    Pitch: %s%4.4f    Yaw: %s%4.4f"), (sensorRoll < 0 ? "-" : "+"), abs(sensorRoll), (sensorPitch < 0 ? "-" : "+"), abs(sensorPitch), (sensorYaw < 0 ? "-" : "+"), abs(sensorYaw));
+////  Serial.printf(F("    ROffset: %s%4.4f    POffset: %s%4.4f    YOffset: %s%4.4f"), (rollCalibration < 0 ? "-" : "+"), abs(rollCalibration), (pitchCalibration < 0 ? "-" : "+"), abs(pitchCalibration), (yawCalibration < 0 ? "-" : "+"), abs(yawCalibration));
 //  Serial.printf(F("    M1: %4d    M2: %4d    M3: %4d    M4: %4d"), m1_val, m2_val, m3_val, m4_val);
-  Serial.printf(F("    Roll: %s%4d    Pitch: %s%4d    Yaw: %s%4d"), rc.channel[ROLL_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[ROLL_CHANNEL]), rc.channel[PITCH_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[PITCH_CHANNEL]), rc.channel[YAW_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[YAW_CHANNEL]));
-//  Serial.printf(F("    RollSp: %s%4.2f    PitchSp: %s%4.2f    YawSp: %s%4.2f"), rollSetPoint < 0 ? "-" : "+", abs(rollSetPoint), pitchSetPoint < 0 ? "-" : "+", abs(pitchSetPoint), yawSetPoint < 0 ? "-" : "+", abs(yawSetPoint));
-//  Serial.printf(F("    RollErr: %s%4.2f    PitchErr: %s%4.2f    YawErr: %s%4.2f"), lastRollError < 0 ? "-" : "+", abs(lastRollError), lastPitchError < 0 ? "-" : "+", abs(lastPitchError), lastYawError < 0 ? "-" : "+", abs(lastYawError));
-  Serial.printf(F("    Motors Armed: %s"), flightState == STATE_RUNNING ? "True" : "False");
-//  Serial.printf(F("    HeartbeatPulse: %d"), heartbeatPulse);
+////  Serial.printf(F("    Roll: %s%4d    Pitch: %s%4d    Yaw: %s%4d"), rc.channel[ROLL_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[ROLL_CHANNEL]), rc.channel[PITCH_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[PITCH_CHANNEL]), rc.channel[YAW_CHANNEL] < 0 ? "-" : "+", abs(rc.channel[YAW_CHANNEL]));
+////  Serial.printf(F("    RollSp: %s%4d    PitchSp: %s%4d    YawSp: %s%4d"), rollSetPoint < 0 ? "-" : "+", abs(rollSetPoint), pitchSetPoint < 0 ? "-" : "+", abs(pitchSetPoint), yawSetPoint < 0 ? "-" : "+", abs(yawSetPoint));
+////  Serial.printf(F("    RollErr: %s%4.2f    PitchErr: %s%4.2f    YawErr: %s%4.2f"), lastRollError < 0 ? "-" : "+", abs(lastRollError), lastPitchError < 0 ? "-" : "+", abs(lastPitchError), lastYawError < 0 ? "-" : "+", abs(lastYawError));
+//  Serial.printf(F("    Motors Armed: %s"), flightState == STATE_RUNNING ? "True" : "False");
+////  Serial.printf(F("    HeartbeatPulse: %d"), heartbeatPulse);
+//  Serial.printf(F("    Loop Rate: %4.2f"), LOOP_RATE);
+//  Serial.printf(F("    Loop DT: %4.2f"), LOOP_DT);
+//  Serial.printf(F("    GyroConst: %4.12f"), GYRO_DEG_SEC_CONST);
   Serial.printf(F("\n"));
 }
 
 void calculatePID() {
-  // Roll PID
+//   Roll PID
 //  rollKp = pidVal;
 //  rollKi = pidVal;
 //  rollKd = pidVal;
-  float rollError = sensorRoll - rollSetPoint;
+  float rollError = gyroRollInput - rollSetPoint;
   rollErrSum += rollKi * rollError;
   if (rollErrSum > ROLL_PID_MAX) rollErrSum = ROLL_PID_MAX;
   if (rollErrSum < ROLL_PID_MAX * -1) rollErrSum = ROLL_PID_MAX * -1;
@@ -513,7 +539,7 @@ void calculatePID() {
 //  pitchKp = pidVal;
 //  pitchKi = pidVal;
 //  pitchKd = pidVal;
-  float pitchError = sensorPitch - pitchSetPoint;
+  float pitchError = gyroPitchInput - pitchSetPoint;
   pitchErrSum += pitchKi * pitchError;
   if (pitchErrSum > PITCH_PID_MAX) pitchErrSum = PITCH_PID_MAX;
   if (pitchErrSum < PITCH_PID_MAX * -1) pitchErrSum = PITCH_PID_MAX * -1;
@@ -524,7 +550,7 @@ void calculatePID() {
   lastPitchError = pitchError;
 
   // Yaw PID
-  float yawError = sensorYaw - yawSetPoint;
+  float yawError = gyroYawInput - yawSetPoint;
   yawErrSum += yawKi * yawError;
   if (yawErrSum > YAW_PID_MAX) yawErrSum = YAW_PID_MAX;
   if (yawErrSum < YAW_PID_MAX * -1) yawErrSum = YAW_PID_MAX * -1;
@@ -534,3 +560,4 @@ void calculatePID() {
   else if (yawOutput < YAW_PID_MAX * -1) yawOutput = YAW_PID_MAX * -1;
   lastYawError = yawError;
 }
+
