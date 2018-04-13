@@ -37,7 +37,7 @@
 // If this value is true, only read the
 // gyro sensor. Otherwise, run a combination
 // filter on accel and gyro data.
-#define GYRO_ONLY true
+#define GYRO_ONLY false
 #define ABSOLUTE_ANGLE false
 
 // +/-  250 dps =  8.75
@@ -62,18 +62,19 @@
 // Controller Sensitivity.
 #if ABSOLUTE_ANGLE
   #define CONTROLER_SENSITIVITY 11.0F
-#else
-  #define CONTROLER_SENSITIVITY 3.0F
-#endif
 
-#if ABSOLUTE_ANGLE
   #define ROLL_PID_KP   1.300000F
   #define ROLL_PID_KI   0.010000F
   #define ROLL_PID_KD   8.000000F
 #else
-  #define ROLL_PID_KP   1.030000F
-  #define ROLL_PID_KI   0.010000F
-  #define ROLL_PID_KD   0.400000F
+  #define CONTROLER_SENSITIVITY 3.0F
+
+  #define ROLL_PID_KP   0.800000F
+  #define ROLL_PID_KI   0.000000F
+  #define ROLL_PID_KD   3.500000F
+//  #define ROLL_PID_KP   1.030000F
+//  #define ROLL_PID_KI   0.010000F
+//  #define ROLL_PID_KD   0.400000F
 #endif
 
 #define PITCH_PID_KP  ROLL_PID_KP
