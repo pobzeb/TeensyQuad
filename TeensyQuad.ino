@@ -344,8 +344,8 @@ void loop() {
 
   // Read the radio input.
   readRadio();
-//  pidVal = rc.channel[TRIM_CHANNEL] * 0.2;  // P (Take dial value and reduce by 50%)
-  pidVal = rc.channel[TRIM_CHANNEL] * 0.01; // I (Take dial value and reduce by 50%)
+  pidVal = rc.channel[TRIM_CHANNEL] * 0.2;  // P (Take dial value and reduce by 50%)
+//  pidVal = rc.channel[TRIM_CHANNEL] * 0.01; // I (Take dial value and reduce by 50%)
 //  pidVal = rc.channel[TRIM_CHANNEL] * 0.1;  // D (Take dial value and reduce by 50%)
 
   // Set the throttle.
@@ -517,10 +517,11 @@ void printResults() {
 
 void calculatePID() {
 //   Roll PID
-//  rollKp = pidVal;
-  rollKi = pidVal;
-//  rollKd = pidVal;
-  float rollError = gyroRollInput - rollSetPoint;
+  rollKp = pitchKp = pidVal;
+//  rollKi = pitchKi = pidVal;
+//  rollKd = pitchKd = pidVal;
+//  float rollError = gyroRollInput - rollSetPoint;
+  float rollError = sensorRoll - rollSetPoint;
   rollErrSum += rollKi * rollError;
   if (rollErrSum > ROLL_PID_MAX) rollErrSum = ROLL_PID_MAX;
   if (rollErrSum < ROLL_PID_MAX * -1) rollErrSum = ROLL_PID_MAX * -1;
@@ -531,10 +532,8 @@ void calculatePID() {
   lastRollError = rollError;
 
   // Pitch PID
-//  pitchKp = pidVal;
-  pitchKi = pidVal;
-//  pitchKd = pidVal;
-  float pitchError = gyroPitchInput - pitchSetPoint;
+//  float pitchError = gyroPitchInput - pitchSetPoint;
+  float pitchError = sensorPitch - pitchSetPoint;
   pitchErrSum += pitchKi * pitchError;
   if (pitchErrSum > PITCH_PID_MAX) pitchErrSum = PITCH_PID_MAX;
   if (pitchErrSum < PITCH_PID_MAX * -1) pitchErrSum = PITCH_PID_MAX * -1;
@@ -545,7 +544,8 @@ void calculatePID() {
   lastPitchError = pitchError;
 
   // Yaw PID
-  float yawError = gyroYawInput - yawSetPoint;
+//  float yawError = gyroYawInput - yawSetPoint;
+  float yawError = sensorYaw - yawSetPoint;
   yawErrSum += yawKi * yawError;
   if (yawErrSum > YAW_PID_MAX) yawErrSum = YAW_PID_MAX;
   if (yawErrSum < YAW_PID_MAX * -1) yawErrSum = YAW_PID_MAX * -1;
