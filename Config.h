@@ -56,7 +56,7 @@
 #define GYRO_ANGLE_CONST (1 / LOOP_RATE) / GYRO_SENSITIVITY
 #define GYRO_ANGLE_RAD_CONST (GYRO_ANGLE_CONST * (3.142 / 180.0))
 
-#define ALPHA 0.8F  // Low pass constant.
+#define ALPHA 0.9996F   // Low pass constant.
 #define GYRO_TRUST 0.7F // Percent Trust for gyro.
 
 // Controller Sensitivity.
