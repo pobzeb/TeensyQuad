@@ -62,9 +62,9 @@
 // Controller Sensitivity.
 #define CONTROLER_SENSITIVITY 3.0F
 
-#define ROLL_PID_KP   0.000000F
+#define ROLL_PID_KP   1.000000F
 #define ROLL_PID_KI   0.000000F
-#define ROLL_PID_KD   0.100000F
+#define ROLL_PID_KD   0.000000F
 //  #define ROLL_PID_KP   1.200000F
 //  #define ROLL_PID_KI   0.020000F
 //  #define ROLL_PID_KD   3.500000F

@@ -261,8 +261,8 @@ void readSensors() {
 void readGyro() {
   // Get the gyro values and convert to dps.
   gyro.read();
-  float fGX = gyro.g.x * GYRO_SENSITIVITY;
-  float fGY = gyro.g.y * GYRO_SENSITIVITY;
+  float fGX = gyro.g.x * GYRO_SENSITIVITY * -1.0;
+  float fGY = gyro.g.y * GYRO_SENSITIVITY * -1.0;
   float fGZ = gyro.g.z * GYRO_SENSITIVITY;
 
   // Adjust by calibration offsets.
@@ -286,8 +286,8 @@ void readGyro() {
 void readAccel() {
   // Get the accel values and scale them.
   Vector norm = accel.readNormalize(ADXL345_GRAVITY_EARTH);
-  float fAX = norm.XAxis * ACCEL_SENSITIVITY;
-  float fAY = norm.YAxis * ACCEL_SENSITIVITY;
+  float fAX = norm.XAxis * ACCEL_SENSITIVITY * -1.0;
+  float fAY = norm.YAxis * ACCEL_SENSITIVITY * -1.0;
   float fAZ = norm.ZAxis * ACCEL_SENSITIVITY;
 
   // Filter the values.
@@ -347,7 +347,7 @@ void loop() {
   readRadio();
   //pidVal = rc.channel[TRIM_CHANNEL] * 0.2;  // P (Take dial value and reduce by 50%)
   //pidVal = rc.channel[TRIM_CHANNEL] * 0.01; // I (Take dial value and reduce by 50%)
-  //pidVal = rc.channel[TRIM_CHANNEL] * 0.1;  // D (Take dial value and reduce by 50%)
+  pidVal = rc.channel[TRIM_CHANNEL] * 0.5;  // D (Take dial value and reduce by 50%)
 
   // Set the throttle.
   throttle = rc.channel[THROTTLE_CHANNEL];
@@ -526,7 +526,7 @@ void calculatePID() {
   // Roll PID
   //rollKp = pitchKp = pidVal;
   //rollKi = pitchKi = pidVal;
-  //rollKd = pitchKd = pidVal;
+  rollKd = pitchKd = pidVal;
   float rollError = gyroRollInput - rollSetPoint;
   rollErrSum += rollKi * rollError;
   if (rollErrSum > ROLL_PID_MAX) rollErrSum = ROLL_PID_MAX;
