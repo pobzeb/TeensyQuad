@@ -11,7 +11,7 @@
 #define TRIM_CHANNEL 4
 #define ARM_CHANNEL 5
 
-#define CALIBRATION_SAMPLE_SIZE 1000
+#define CALIBRATION_SAMPLE_SIZE 2000
 
 // Heartbeat timeout in milliseconds
 #define HEARTBEAT_TIMEOUT 500
@@ -62,9 +62,9 @@
 // Controller Sensitivity.
 #define CONTROLER_SENSITIVITY 3.0F
 
-#define ROLL_PID_KP   1.000000F
+#define ROLL_PID_KP   0.000000F
 #define ROLL_PID_KI   0.000000F
-#define ROLL_PID_KD   0.000000F
+#define ROLL_PID_KD  15.000000F
 //  #define ROLL_PID_KP   1.200000F
 //  #define ROLL_PID_KI   0.020000F
 //  #define ROLL_PID_KD   3.500000F
